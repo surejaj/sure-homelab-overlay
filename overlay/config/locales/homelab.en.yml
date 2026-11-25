@@ -1,0 +1,22 @@
+# Homelab overlay (not upstream Sure): labels for the register view.
+en:
+  homelab:
+    register:
+      toggle_label: List view
+      default: Default
+      register: Register
+      date: Date
+      payee: Payee
+      category: Category
+      tags: Tags
+      amount: Amount
+      balance: Balance
+      memo: Memo
+      account_memo: Account / memo
+      balance_update: Balance update
+      trade: Trade
+      uncategorized: Uncategorized
+      pending: Pending
+      split_part: Split part
+      balance_title: Balance after this entry (from the daily balances; stale while a sync runs)
+      adjustment_title: Change set by this balance update

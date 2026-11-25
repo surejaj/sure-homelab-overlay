@@ -1,0 +1,74 @@
+<%# locals: (entry:, row:, account:, grid:, view_ctx: "global") %>
+<%# Homelab overlay (not upstream Sure): one register line (transaction,
+    valuation or trade). Wrapped in the same turbo frame id as the upstream
+    row, so a drawer edit that stream-replaces dom_id(entry) still updates it
+    (with the upstream row, until the next page load or sync refresh). %>
+<% single_account = account.present? %>
+<% transaction = entry.entryable if entry.entryable_type == "Transaction" %>
+<% transfer = transaction&.transfer %>
+<% category_label, category_title = register_category_label(entry) %>
+<% memo = register_memo(entry, single_account: single_account) %>
+<% tag_names = transaction ? transaction.tags.map(&:name).join(", ") : "" %>
+<% amount_text = if entry.entryable_type == "Valuation"
+     row&.adjustment ? format_money(Money.new(row.adjustment, entry.currency)) : ""
+   elsif transaction&.transfer? && view_ctx == "global" && !single_account
+     "+/- #{format_money(entry.amount_money.abs)}"
+   else
+     format_money(-entry.amount_money)
+   end %>
+
+<%= turbo_frame_tag dom_id(entry), class: "block" do %>
+  <div class="<%= class_names(
+         "group grid items-center gap-x-2 h-8 px-2 text-sm text-primary cursor-pointer hover:bg-container-hover",
+         grid,
+         "opacity-50": entry.excluded
+       ) %>"
+       data-controller="clickable-row"
+       data-action="click->clickable-row#open"
+       data-testid="homelab-register-row"
+       data-entry-type="<%= entry.entryable_type %>">
+    <div class="hidden @md:flex items-center">
+      <%= check_box_tag dom_id(entry, "selection"),
+            disabled: transfer.present?,
+            class: "checkbox checkbox--light hidden lg:block",
+            data: {
+              id: entry.id,
+              entry_type: entry.entryable_type,
+              "bulk-select-target": "row",
+              action: "bulk-select#toggleRowSelection",
+              checkbox_toggle_target: "selectionEntry"
+            } %>
+    </div>
+
+    <span class="text-xs text-secondary tabular-nums"><%= register_date(entry.date) %></span>
+
+    <div class="flex items-center gap-1 min-w-0">
+      <% if entry.split_child? %>
+        <span class="text-subdued shrink-0" title="<%= t("homelab.register.split_part") %>"><%= icon "corner-down-right", size: "xs", color: "current" %></span>
+      <% end %>
+      <% if transaction&.pending? %>
+        <span class="text-subdued shrink-0" title="<%= t("homelab.register.pending") %>"><%= icon "clock", size: "xs", color: "current" %></span>
+      <% end %>
+      <%= link_to entry.entryable_type == "Valuation" ? entry.entryable.display_name(entry) : entry.name,
+            register_open_path(entry),
+            title: entry.name,
+            data: { turbo_frame: "drawer", turbo_prefetch: false, clickable_row_target: "link" },
+            class: "truncate hover:underline" %>
+    </div>
+
+    <span class="<%= class_names("hidden @md:block truncate", "text-subdued": transaction && !transaction.transfer? && transaction.category.nil?, "text-secondary": entry.entryable_type == "Valuation") %>"
+          title="<%= category_title || category_label %>"><%= category_label %></span>
+
+    <span class="hidden @2xl:block truncate text-xs text-secondary" title="<%= tag_names %>"><%= tag_names %></span>
+
+    <span class="<%= class_names("justify-self-end tabular-nums whitespace-nowrap privacy-sensitive", "text-green-600": entry.entryable_type != "Valuation" && entry.amount.negative?, "text-secondary": entry.entryable_type == "Valuation") %>"
+          <% if entry.entryable_type == "Valuation" %>title="<%= t("homelab.register.adjustment_title") %>"<% end %>><%= amount_text %></span>
+
+    <% if single_account %>
+      <span class="<%= class_names("hidden @md:block justify-self-end tabular-nums whitespace-nowrap italic privacy-sensitive", entry.entryable_type == "Valuation" ? "text-primary font-medium" : "text-secondary") %>"
+            title="<%= t("homelab.register.balance_title") %>"><%= row ? format_money(Money.new(row.balance, account.currency)) : "–" %></span>
+    <% end %>
+
+    <span class="hidden @md:block truncate text-xs text-secondary" title="<%= memo %>"><%= memo %></span>
+  </div>
+<% end %>

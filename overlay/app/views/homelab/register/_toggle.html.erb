@@ -1,0 +1,22 @@
+<%# Homelab overlay (not upstream Sure): Default / Register switch. Saves the
+    per-user preference, then reloads the page it is on (whole page, so it
+    also works inside the account activity turbo frame). %>
+<% current = register_view? ? "register" : "default" %>
+<div class="inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-surface-inset text-xs font-medium shrink-0"
+     role="group"
+     aria-label="<%= t("homelab.register.toggle_label") %>"
+     data-testid="homelab-register-toggle">
+  <% Homelab::RegisterHelper::TRANSACTIONS_VIEWS.each do |view| %>
+    <%= button_to t("homelab.register.#{view}"),
+          homelab_transactions_view_preference_path,
+          method: :patch,
+          params: { view: view },
+          form: { data: { turbo_frame: "_top" }, class: "contents" },
+          disabled: view == current,
+          aria: { pressed: view == current },
+          class: class_names(
+            "px-2.5 py-1 rounded-md",
+            view == current ? "bg-container text-primary shadow-border-xs cursor-default" : "text-secondary hover:text-primary cursor-pointer"
+          ) %>
+  <% end %>
+</div>

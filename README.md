@@ -7,8 +7,8 @@ checks that the upstream files we override or depend on are unchanged, copies `o
 
 Plan and feature design: `docs/sure-custom-image-plan.md` in the homelab monorepo.
 
-Status: phase 2 (transfer API) built and tested locally; not pushed or deployed. Phase 1 (skeleton)
-is done.
+Status: phase 5 (register view) and phase 2 (transfer API) built and tested locally; not pushed
+or deployed. Phase 1 (skeleton) is done.
 
 ## Features
 
@@ -30,6 +30,25 @@ is done.
 - Responses use the upstream `api/v1/transfers/show` and
   `api/v1/rejected_transfers/_rejected_transfer` jbuilder views.
 
+**Condensed register view** (Quicken-style; `app/views/homelab/register/*`,
+`app/helpers/homelab/register_helper.rb`, `app/models/homelab/running_balance.rb`):
+
+- A Default / Register toggle on the transactions list and on the account Activity tab. The
+  choice is per user, in `users.preferences["transactions_view"]`, saved by
+  `PATCH /homelab/preferences/transactions_view` (`view=default|register`;
+  `Homelab::PreferencesController`, through `User#with_locked_preferences`; 303 back to the page).
+- Register: one 32px line per entry, no day cards. Columns: select box, date (MM/DD/YY),
+  name, category (plain text; transfers show `→ Other account` / `← Other account`), tags, amount
+  (inflows green, as upstream), running balance (only for one account: the Activity tab, or the
+  transactions list filtered to exactly one account), and memo (notes; plus the account name
+  when several accounts are listed). Valuations are rows too: amount = the adjustment, balance =
+  the balance they set. Clicking a row opens the usual drawer (transfers open the transfer drawer).
+- Running balance: two indexed queries per page, the `balances` rows for the page's dates and
+  all of the account's entries on those dates, walked in upstream's `reverse_chronological`
+  order. See the header of `running_balance.rb` for the rules.
+- Known limits: a drawer edit stream-replaces the edited row with the upstream (tall) row until
+  the next page load or sync refresh; balances are stale while a sync runs.
+
 ## Layout
 
 | Path | Purpose |
@@ -37,6 +56,11 @@ is done.
 | `Dockerfile` | `FROM ghcr.io/we-promise/sure:<tag>@sha256:<digest>`, pin check, overlay copy, precompile |
 | `overlay/` | Files copied onto `/rails` (same relative paths as upstream) |
 | `overlay/UPSTREAM_PINS` | `sha256sum -c` list of upstream files (paths relative to `/rails`) that must not change |
+
+Overridden upstream files (each an upstream copy plus one small branch, marked
+`Modified by homelab overlay`): `app/views/transactions/_list.html.erb` and
+`app/components/UI/account/activity_feed.html.erb` (the account Activity tab; upstream's
+`app/views/accounts/show/_activity.html.erb` is not rendered anywhere in 0.7.6-hotfix.1).
 
 `overlay/UPSTREAM_PINS` itself is also copied to `/rails/UPSTREAM_PINS`, which documents the
 pins inside the image.
@@ -68,7 +92,8 @@ docker run --rm -e SECRET_KEY_BASE_DUMMY=1 sure-custom:dev \
 ```
 
 Tests (run inside the image against postgres + redis; see the workflow for the exact
-command): `bin/rails test test/controllers/api/v1/transfer_writes_controller_test.rb …` and
+command): `bin/rails test test/controllers/api/v1/transfer_writes_controller_test.rb
+test/models/homelab test/controllers/homelab …` and
 `bundle exec rspec --pattern spec/requests/api/v1/transfer_writes_spec.rb`. The `--pattern` is
 required: upstream `.rspec` sets a pattern that otherwise loads every API spec, many of which
 already fail upstream. Keep `PARALLEL_WORKERS` low (4), because one worker per CPU hangs.
